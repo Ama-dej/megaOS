@@ -10,7 +10,7 @@ START:
 
 LOOP:
 	INC R16
+	INC R17
 
 HANG:
 	RJMP HANG
-	
