@@ -1,9 +1,6 @@
 .INCLUDE "m328pdef.inc"
+.INCLUDE "interrupt.asm"
 
-.ORG 0x0000
-RESET: JMP START
-
-.ORG 0x0034
 START:
 	; QWERTYUIOP
 	CLI
