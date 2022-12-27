@@ -5,14 +5,10 @@
 .EQU CPU_FREQ = 16000000
 .EQU BAUD = 9600 
 .EQU BPS = (CPU_FREQ / 16 / BAUD) - 1
-<<<<<<< HEAD
 
-.EQU RX_BUFFER_SIZE = 2^6 
+.EQU RX_BUFFER_SIZE = 2^6 ; More bit potenca dvojke!!!!!
 
-=======
-; TODO BUFFER ZA SERICA (AMADEJ)
 ; TODO BACK SPACE, CR, NL (JAKOB)
->>>>>>> 1c6a17723275520cfd3c08a491f746efe48fbe34
 START:
 	CLI
 
@@ -29,16 +25,14 @@ START:
 	LDI R16, (1 << RXEN0) | (1 << TXEN0) | (1 << RXCIE0) | (1 << TXCIE0) | (1 << UDRIE0)
 	STS UCSR0B, R16
 
-	LDI R16, 1
-	STS TX_BUSY, R16
-
 	CLR R16
+	STS TX_BUSY, R16
 	STS WRITE_HEAD_L, R16
 	STS READ_HEAD_L, R16
 
 	SEI
 
-
+; Kot primer je tle en napisan echo loop.
 LOOP:
 	CALL GETCHAR
 	CPI R16, -1 
@@ -53,8 +47,7 @@ DONT_RESET:
 HANG:
 	RJMP HANG
 
-<<<<<<< HEAD
-; Ta procedura pošlje znak v registru R16 po UART-u.
+; Pošlje znak v registru R16 po UART-u.
 ;
 ; R16 -> Znak, ki ga želimo poslati.
 PUTCHAR:
@@ -73,6 +66,10 @@ PUTCHAR_WAIT:
 	POP R17
 	RET
 
+; Dobi znak iz RX buffer-ja in ga da v R16.
+; Zadevščina zna vrnit -1, kar pomeni da se write head in read head prekrivata (nimaš več kej za brat).
+;
+; R16 <- Znak, prebran iz RX buffer-ja. 
 GETCHAR:
 	PUSH R17
 	PUSH XL
@@ -85,13 +82,6 @@ GETCHAR:
 	CP XL, R17
 	BREQ GETCHAR_OVERLAP
 
-	LDS R17, RX_BUFFER_COUNT
-	CPI R17, 0
-	BREQ GETCHAR_NO_CHAR_LEFT
-
-	DEC R17
-	STS RX_BUFFER_COUNT, R17
-
 	LD R16, X+
 	ANDI XL, RX_BUFFER_SIZE - 1
 	STS READ_HEAD_L, XL
@@ -99,10 +89,6 @@ GETCHAR:
 
 GETCHAR_OVERLAP:
 	LDI R16, -1 
-	RJMP GETCHAR_OUT
-
-GETCHAR_NO_CHAR_LEFT:
-	LDI R16, -2
 
 GETCHAR_OUT:
 	POP XH
@@ -112,47 +98,45 @@ GETCHAR_OUT:
 
 .DSEG
 .ORG 0x0100
+; Pred RX_BUFFER-jem mi ne vrivi nč.
 RX_BUFFER: .BYTE RX_BUFFER_SIZE
+; Tle naprej se lohk dela nove bufferje.
 WRITE_HEAD_L: .BYTE 1
 READ_HEAD_L: .BYTE 1
 TX_BUSY: .BYTE 1
-RX_BUFFER_COUNT: .BYTE 1
-=======
 
-
-
-LOCI_UKAZ:
-	PUSH R16
-	PUSH PUSH XL
-	PUSH PUSH XH
-	PUSH PUSH YL
-	PUSH PUSH YH
-	LDI XL, LOW("BUFFER_ZACETEK")
-	LDI XH, HIGH("BUFFER_ZACETEK")
-	LDI YL, LOW(PARAMETER)
-	LDI YH, HIGH(PARAMETER)
-	LOCI:
-		LD R16, X+
-		CPI R16, 0x20
-		BRNE LOCI
-		INC X
-	LOCI2:
-		LD R16,X+
-		CPI R16, 0x00
-		BREQ VRNI
-		CPI R16, 0x20
-		BREQ LOCI2
-		ST Y+, R16
-		RJMP LOCI2
-	VRNI:
-		POP YH
-		POP YL
-		POP XH
-		POP XL
-		POP R16
-		RET
-
-
-.DSEG
-PARAMETER:  .BYTE 20
->>>>>>> 1c6a17723275520cfd3c08a491f746efe48fbe34
+; .CSEG
+; LOCI_UKAZ:
+;	PUSH R16
+;	PUSH XL
+;	PUSH XH
+;	PUSH YL
+;	PUSH YH
+;	LDI XL, LOW("BUFFER_ZACETEK")
+;	LDI XH, HIGH("BUFFER_ZACETEK")
+;	LDI YL, LOW(PARAMETER)
+;	LDI YH, HIGH(PARAMETER)
+;	LOCI:
+;		LD R16, X+
+;		CPI R16, 0x20
+;		BRNE LOCI
+;		INC X
+;	LOCI2:
+;		LD R16,X+
+;		CPI R16, 0x00
+;		BREQ VRNI
+;		CPI R16, 0x20
+;		BREQ LOCI2
+;		ST Y+, R16
+;		RJMP LOCI2
+;	VRNI:
+;		POP YH
+;		POP YL
+;		POP XH
+;		POP XL
+;		POP R16
+;		RET
+;
+;
+; .DSEG
+; PARAMETER:  .BYTE 20
