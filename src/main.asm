@@ -6,8 +6,8 @@
 .EQU BAUD = 9600 
 .EQU BPS = (CPU_FREQ / 16 / BAUD) - 1
 
-.EQU RX_BUFFER_SIZE = 2^6 ; More bit potenca dvojke!!!!!
-.EQU BUFFER2_SIZE = 2^6
+.EQU RX_BUFFER_SIZE = 64 ; More bit potenca dvojke!!!!!
+.EQU BUFFER2_SIZE = 64 
 
 START:
 	CLI
@@ -16,9 +16,12 @@ START:
 	OUT SPL, R16
 	LDI R16, HIGH(RAMEND)
 	OUT SPH, R16
-	CLR R16
 
-	CALL  BUFFER2_SETUP
+	LDI XL, LOW(BUFFER2)
+	LDI XH, HIGH(BUFFER2)
+	LDI R16, 0 
+	LDI R17, BUFFER2_SIZE
+	CALL MEMSET
 
 	LDI R16, LOW(BPS)
 	LDI R17, HIGH(BPS)
@@ -35,32 +38,41 @@ START:
 
 	SEI
 
+	LDI ZL, LOW(POZDRAV * 2)
+	LDI ZH, HIGH(POZDRAV * 2)
+	CALL FPRINTS
+
 ; Kot primer je tle en napisan echo loop.
 LOOP:
 
-	COPY_BUFFER:
-	LDI XL, LOW(BUFFER2)
-	LDI XH, HIGH(BUFFER2)
-	LDI R18, BUFFER2_SIZE
-	COPY_BUFFER2:
-		CALL GETCHAR
-		CPI R16, -1 ; TODO CE  ZASTACUICE  ZBRISI R16, -1
-		BREQ COPY_BUFFER
-		ST X+, R16
-		CPI R16, 0x0A
-		BRNE NAPREJ
-		CALL LOCI_UKAZ
-	NAPREJ:
-	CALL PUTCHAR
-	DEC R18
-	BREQ COPY_BUFFER
-	RJMP COPY_BUFFER2
+	; COPY_BUFFER:
+	; LDI XL, LOW(BUFFER2)
+	; LDI XH, HIGH(BUFFER2)
+	; LDI R18, BUFFER2_SIZE
+	; COPY_BUFFER2:
+	; 	CALL GETCHAR
+	;	BREQ COPY_BUFFER
+	;	ST X+, R16
+	;	CPI R16, 0x0A
+	;	BRNE NAPREJ
+	;	CALL LOCI_UKAZ
+	; NAPREJ:
+	; CALL PUTCHAR
+	; DEC R18
+	; BREQ COPY_BUFFER
+	; RJMP COPY_BUFFER2
 
+	CALL GETCHAR
+	BREQ LOOP
+	
+	CALL PUTCHAR
 
 	RJMP LOOP
 
 HANG:
 	RJMP HANG
+
+POZDRAV: .DB "megaOS (ver 69.420)", 0x0A, 0x0D, 0x00
 
 ; Pošlje znak v registru R16 po UART-u.
 ;
@@ -82,7 +94,7 @@ PUTCHAR_WAIT:
 	RET
 
 ; Dobi znak iz RX buffer-ja in ga da v R16.
-; Zadevščina zna vrnit -1, kar pomeni da se write head in read head prekrivata (nimaš več kej za brat).
+; Če je zero flag postavljen pomeni, da ni več ničesar v RX buffer-ju. 
 ;
 ; R16 <- Znak, prebran iz RX buffer-ja. 
 GETCHAR:
@@ -95,15 +107,12 @@ GETCHAR:
 
 	LDS R17, WRITE_HEAD_L
 	CP XL, R17
-	BREQ GETCHAR_OVERLAP
+	BREQ GETCHAR_OUT
 
 	LD R16, X+
 	ANDI XL, RX_BUFFER_SIZE - 1
 	STS READ_HEAD_L, XL
-	RJMP GETCHAR_OUT
-
-GETCHAR_OVERLAP:
-	LDI R16, -1 
+	CLZ
 
 GETCHAR_OUT:
 	POP XH
@@ -123,11 +132,100 @@ BUFFER2_SETUP:
 	BUFFER2_CLEAR:
 	ST X+, R17
 	DEC R16
-	BRNE BUFFER2_SETUP
+	BRNE BUFFER2_CLEAR
 	POP R17
 	POP R16
 	POP XH
 	POP XL
+	RET
+
+; Nastavi buffer na dano vrednost.
+;
+; X -> Lokacija bufferja.
+; R16 -> Vrednost na katero hočemo nastavit buffer.
+; R17 -> Velikost bufferja.
+MEMSET:
+	PUSH R17
+	PUSH XL
+	PUSH XH
+
+MEMSET_LOOP:
+	ST X+, R16
+	DEC R17
+	BRNE MEMSET_LOOP
+
+	POP XH
+	POP XL
+	POP R17
+	RET
+
+; Kopira en buffer v drugega.
+;
+; X -> Buffer v katerega bodo šle kopirane vrednosti.
+; Y -> Buffer iz katerega kopiramo.
+; R16 -> Velikost bufferja.
+MEMCPY:
+	PUSH R16
+	PUSH R17
+	PUSH XL
+	PUSH XH
+	PUSH YL
+	PUSH YH
+
+MEMCPY_LOOP:
+	LD R17, Y+
+	ST X+, R17
+	DEC R16
+	BRNE MEMCPY_LOOP
+
+	POP YH
+	POP YL
+	POP XH
+	POP XL
+	POP R17
+	POP R16
+	RET
+
+; Pošlje besedilo v flash-u po UART-u.
+;
+; Z -> Lokacija besedila v flash-u.
+FPRINTS:
+	PUSH R16
+	PUSH ZL
+	PUSH ZH
+
+FPRINTS_LOOP:
+	LPM R16, Z+
+	OR R16, R16
+	BREQ FPRINTS_OUT
+	CALL PUTCHAR
+	RJMP FPRINTS_LOOP
+
+FPRINTS_OUT:
+	POP ZH
+	POP ZL
+	POP R16
+	RET
+
+; Pošlje besedilo v RAM-u po UART-u.
+;
+; X -> Lokacija besedila v RAM-u.
+MPRINTS:
+	PUSH R16
+	PUSH XL
+	PUSH XH
+
+MPRINTS_LOOP:
+	LD R16, X+
+	OR R16, R16
+	BREQ MPRINTS_OUT
+	CALL PUTCHAR
+	RJMP MPRINTS_LOOP
+
+MPRINTS_OUT:
+	POP XH
+	POP XL
+	POP R16
 	RET
 
 ; Loci ukaz na parameter in ukaz.
@@ -194,7 +292,6 @@ WRITE_HEAD_L: .BYTE 1
 READ_HEAD_L: .BYTE 1
 TX_BUSY: .BYTE 1
 
-BUFFER2:	.BYTE BUFFER2_SIZE
-PARAMETER:  .BYTE BUFFER2_SIZE - 6
-UKAZ: 		.BYTE 6  ; MAKS DOLZINA UKAZA JE 5 KER PAC
-
+BUFFER2: .BYTE BUFFER2_SIZE
+PARAMETER: .BYTE BUFFER2_SIZE - 6
+UKAZ: .BYTE 6  ; MAKS DOLZINA UKAZA JE 5 KER PAC
