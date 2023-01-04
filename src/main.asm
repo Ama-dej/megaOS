@@ -54,76 +54,144 @@ START:
 	LDI ZH, HIGH(POZDRAV * 2)
 	CALL FPRINTS
 
-
-
-	;LDI XL, LOW(BUFFER2)
-    ;LDI XH, HIGH(BUFFER2)
-    ;LDI R17, BUFFER2_SIZE - 1
-    ;LDI R16 , 'a'
-    ;CALL MEMSET
-    ;LDI XL, LOW(BUFFER2)
-    ;LDI XH, HIGH(BUFFER2)
-    ;LDI R16, 0x00
-    ;STS BUFFER2 + BUFFER2_SIZE - 1, R16
-    ;CALL MPRINTS
-    ;CLR XL
-    ;CLR XH
-
-; Kot primer je tle en napisan echo loop.
 LOOP:
-	LDI XL, LOW(UKAZ)
-	LDI XH, HIGH(UKAZ)
-	LDI R16, 0x00
-	LDI R17, 0X08
-	CALL MEMSET
-	LDI XL, LOW(PARAMETER)
-	LDI XH, HIGH(PARAMETER)
-	LDI R16, 0x00
-	LDI	R17, BUFFER2_SIZE - 6
-	CALL MEMSET
-
-	COPY_BUFFER:
 	LDI XL, LOW(BUFFER2)
 	LDI XH, HIGH(BUFFER2)
-	LDI R18, BUFFER2_SIZE - 1
-	COPY_BUFFER2:
-		CALL GETCHAR
-		BREQ COPY_BUFFER2
-		DEC R18
-		BREQ NAPREJ
-		ST X+, R16
-		CPI R16, 0x0D
-		BREQ NAPREJ
-		CALL PUTCHAR
-		RJMP COPY_BUFFER2
-	NAPREJ:
-	;CALL PUTCHAR
-	;RJMP COPY_BUFFER2
+	LDI R16, 0x00
+	LDI R17, BUFFER2_SIZE
+	CALL MEMSET
+
+	LDI XL, LOW(UKAZ)
+	LDI XH, HIGH(UKAZ)
+	LDI R16, 0x00
+	LDI R17, 8
+	CALL MEMSET
+
+	LDI XL, LOW(PARAMETER)
+	LDI XH, HIGH(PARAMETER)
+	LDI R16, 0x00
+	LDI R17, BUFFER2_SIZE - 8
+	CALL MEMSET
+
+	LDI XL, LOW(BUFFER2)
+	LDI XH, HIGH(BUFFER2)
+
+	LDI R16, '>'
+	CALL PUTCHAR
+
+WAIT_FOR_CHARACTER:
+	CALL GETCHAR
+	BREQ WAIT_FOR_CHARACTER
+
+	CPI R16, 0x7F ; DEL 
+	BRNE SAVE_TO_BUFFER
+
+	CPI XL, LOW(BUFFER2) ; Za bufferje manjše od 256 byte-ov bo ta goljufija delala.
+	BREQ WAIT_FOR_CHARACTER
+
+	CALL PUTCHAR
+	CLR R16
+	ST -X, R16
+	RJMP WAIT_FOR_CHARACTER
+
+SAVE_TO_BUFFER:	
+	CALL PUTCHAR
+	ST X+, R16
+	
+	CPI R16, 0x0D
+	BRNE WAIT_FOR_CHARACTER	
+
 	CALL LOCI_UKAZ
-	LDI ZL, LOW(CRNL*2)
-	LDI ZH, HIGH(CRNL*2)
-	CALL FPRINTS
+
+	LDI R16, 0x0A
+	CALL PUTCHAR
+	LDI R16, 0x0D
+	CALL PUTCHAR
 
 	LDI XL, LOW(UKAZ)
 	LDI XH, HIGH(UKAZ)
 	CALL MPRINTS
+
 	LDI XL, LOW(PARAMETER)
 	LDI XH, HIGH(PARAMETER)
 	CALL MPRINTS
-	;CALL BUFFER2_SETUP
 
-	;CALL GETCHAR
-	;BREQ LOOP
+	CLR R18
+
+	LDI YL, LOW(UKAZ)
+	LDI YH, HIGH(UKAZ)
+
+	LDI ZL, LOW(COMMAND_START * 2)
+	LDI ZH, HIGH(COMMAND_START * 2)
+
+COMMAND_SEEK_LOOP:
+	CALL STRMFCMP
+	BREQ FOUND
+
+	INC R18
+
+	CALL STRFLEN
+	ADD ZL, R16
+	ADC ZH, R17
+
+	LPM R16, Z
+	CPI R16, 0x03
+	BREQ NOT_FOUND
+
+	RJMP COMMAND_SEEK_LOOP
+
+FOUND:
+	LDI ZL, LOW(COMMAND_JUMP_TABLE_START)
+	LDI ZH, HIGH(COMMAND_JUMP_TABLE_START)
+
+	CLR R19
+	LSL R18
 	
-	;CALL PUTCHAR
+	ADD ZL, R18
+	ADC ZH, R19	
+	
+	IJMP
 
-	RJMP LOOP
+NOT_FOUND:
+	LDI ZL, LOW(NOT_FOUND_MSG * 2)
+	LDI ZH, HIGH(NOT_FOUND_MSG * 2)
+	CALL FPRINTS
+
+	JMP LOOP
 
 HANG:
 	RJMP HANG
 
 POZDRAV: .DB "megaOS (ver 69.420)", 0x0A, 0x0D, 0x00
-CRNL: .DB 0x0A, 0x0D, 0x00
+FOUND_MSG: .DB "Command found!", 0x0A, 0x0D, 0x00
+NOT_FOUND_MSG: .DB "Command not found.", 0x0A, 0x0D, 0x00
+LEN_PROGRAMER: .DB "Ni implementirano ker je bil programer len.", 0x0A, 0x0D, "Lp programer", 0x0D, 0x0A, 0x00
+
+COMMAND_START:
+.DB "echo", 0x00, "sus", 0x00, 0x03
+COMMAND_END:
+
+COMMAND_JUMP_TABLE_START:
+JUMP_ECHO: JMP ECHO 
+JUMP_SUS: JMP SUS
+COMMAND_JUMP_TABLE_END:
+
+JERMA_SUS:
+.DB "                     .,..,,*,,..,,,,,,,**", 0x0D, 0x0A, "                 .*,,...................,*/", 0x0D, 0x0A, "               ,,...../..,.,,,***/******,,*,*//", 0x0D, 0x0a, "             ,,.  ..,,,,,//((##%%%%%%####(/,,..,*", 0x0D, 0x0a, "           .,*.  ,,****,/((#####%%%&%%#####(/*....", 0x0D, 0x0a, "           *.. .**//***/((((###%%%%&%%####(#(/,....", 0x0D, 0x0a, "          ,,...*****/*/(((#######%%%%%%#####(/*....", 0x0D, 0x0a, "          ., .,****/((((((((((######%%%#####((*....", 0x0D, 0x0a, "           ...***,,,,*///(((((((((((/****//(##/,..,", 0x0D, 0x0a, "           ...,,**,....,,,**/((//**...,,..,*/##,...", 0x0D, 0x0a, "            ,.***.,**   ,.,,(#%#*.,**,.,(/(*/#%*.//", 0x0D, 0x0a, "           /../*,,,*/,,,,,,*(###((/*,,,,/(##//(/,*(", 0x0D, 0x0a, "           .,,***/(((((//***/##(((((////(((###///(%", 0x0D, 0x0a, "           , ,**//(((/****,/((#(((((/***/(((((((#%%", 0x0D, 0x0a, "            .******.,*,****/(((((//(((//**,*(#*(#(.", 0x0D, 0x0a, "              ****,,,**,,,,,****//(((/**,,..,/**", 0x0D, 0x0a, "              **/,/*,.,,,,,*,*/*****#//../*./(/", 0x0D, 0x0a, "               ****/*,,#%#&(%%#&&&@@&&.*(/,(*/", 0x0D, 0x0a, "                ,**//**,.*%#%%%&&##*#**((((//", 0x0D, 0x0a, "                  .*//**,*,(((*(#(%%(/((#(*", 0x0D, 0x0a, "              .,***,,/***//***/*///((((#((/(#/##", 0x0D, 0x0a, "        .,****.*/* *,,,****///////((((#(*/(((*/##(##%%", 0x0D, 0x0a, "((///***,,****.**.**,,,,,///(((((((#(((*//,/#/(#########(#%", 0x0D, 0x0a, "/*,,,,**,,**/*,/*,,,,***,,*//(((((((/,*//((*,/###########%%#", 0x0D, 0x0a, 0x00
+
+ECHO:
+	LDI ZL, LOW(LEN_PROGRAMER * 2)
+	LDI ZH, HIGH(LEN_PROGRAMER * 2)
+	CALL FPRINTS
+
+	JMP LOOP
+
+SUS:
+	LDI ZL, LOW(JERMA_SUS * 2)
+	LDI ZH, HIGH(JERMA_SUS * 2)
+	CALL FPRINTS
+
+	JMP LOOP
 
 ; Pošlje znak v registru R16 po UART-u.
 ;
@@ -278,10 +346,72 @@ MPRINTS_OUT:
 	CALL PUTCHAR
 	LDI R16, 0x0D
 	CALL PUTCHAR
+
 	POP XH
 	POP XL
 	POP R16
 	RET
+
+; Primerja string v RAM-u in string v flash-u. Zastavica zero je postavljena če sta stringa enaka.
+;
+; Y -> String v RAM-u.
+; Z -> String v flash-u.
+STRMFCMP:
+	PUSH R16
+	PUSH R17
+	PUSH YL
+	PUSH YH
+	PUSH ZL
+	PUSH ZH
+
+STRMFCMP_LOOP:
+	LD R16, Y+
+	LPM R17, Z+
+
+	CP R16, R17
+	BRNE STRMFCMP_OUT
+
+	CPI R16, 0
+	BRNE STRMFCMP_LOOP
+
+STRMFCMP_OUT:
+	POP ZH
+	POP ZL
+	POP YH
+	POP YL
+	POP R17
+	POP R16
+	RET
+
+; Vrne dolžino stringa v flash-u v R16:R17.
+;
+; Z -> Naslov buffer-ja.
+STRFLEN:
+	PUSH ZL
+	PUSH ZH
+
+STRFLEN_LOOP:
+	LPM R16, Z+
+	OR R16, R16
+	BRNE STRFLEN_LOOP
+
+STRFLEN_OUT:
+	POP R17 ; ZH
+	SUB ZH, R17
+
+	PUSH R17
+	MOV R17, ZH
+	POP ZH
+
+	POP R16 ; ZL
+	SUB ZL, R16
+
+	PUSH R16
+	MOV R16, ZL 
+	POP R16
+
+	RET
+
 
 ; Loci ukaz na parameter in ukaz.
 LOCI_UKAZ:
@@ -298,35 +428,35 @@ LOCI_UKAZ:
 	LDI YL, LOW(UKAZ)
 	LDI YH, HIGH(UKAZ)
 
-	LOCI_1:
+LOCI_1:
 	LD R17, X+
-	CPI R17,  0x20
+	CPI R17, 0x20
 	BREQ NAPREJ2
-	CPI R17, 0X00
+	CPI R17, 0x00
 	BREQ KONEC
 	DEC R18 
 	BREQ KONEC
 	ST Y+, R17
 	RJMP LOCI_1
 
-	NAPREJ2:
+NAPREJ2:
 	LDI R17, 0x00
 	ST Y , R17
 	LDI R18, BUFFER2_SIZE - 8
 	LDI YL, LOW(PARAMETER)
 	LDI YH, HIGH(PARAMETER)
 
-	LOCI_PARAMETER2:
+LOCI_PARAMETER2:
 	DEC R18
 	BREQ KONEC
 	LD R17, X+
 	ST Y+, R17
-	CPI R17,  0X0D
+	CPI R17, 0x0D
 	BRNE LOCI_PARAMETER2 
 	LDI R17, 0x00
 	ST Y, R17
 
-	KONEC:
+KONEC:
 	CALL BUFFER2_SETUP
 	POP R18
 	POP R17
@@ -335,7 +465,6 @@ LOCI_UKAZ:
 	POP XH
 	POP XL
 	RET
-
 
 .DSEG
 .ORG 0x0100
@@ -346,6 +475,6 @@ WRITE_HEAD_L: .BYTE 1
 READ_HEAD_L: .BYTE 1
 TX_BUSY: .BYTE 1
 
-BUFFER2: .BYTE BUFFER2_SIZE
 PARAMETER: .BYTE BUFFER2_SIZE - 8
 UKAZ: .BYTE 8  ; MAKS DOLZINA UKAZA JE 5 KER PAC
+BUFFER2: .BYTE BUFFER2_SIZE
