@@ -108,13 +108,13 @@ SAVE_TO_BUFFER:
 	LDI R16, 0x0D
 	CALL PUTCHAR
 
-	LDI XL, LOW(UKAZ)
-	LDI XH, HIGH(UKAZ)
-	CALL MPRINTS
-
-	LDI XL, LOW(PARAMETER)
-	LDI XH, HIGH(PARAMETER)
-	CALL MPRINTS
+	;LDI XL, LOW(UKAZ)
+	;LDI XH, HIGH(UKAZ)
+	;CALL MPRINTS
+								; <--- samo za debuging
+	;LDI XL, LOW(PARAMETER)
+	;LDI XH, HIGH(PARAMETER)
+	;CALL MPRINTS
 
 	CLR R18
 
@@ -173,25 +173,77 @@ COMMAND_END:
 
 COMMAND_JUMP_TABLE_START:
 JUMP_ECHO: JMP ECHO 
-JUMP_SUS: JMP SUS
+JUMP_PIN:  JMP PIN
 COMMAND_JUMP_TABLE_END:
 
-JERMA_SUS:
-.DB "                     .,..,,*,,..,,,,,,,**", 0x0D, 0x0A, "                 .*,,...................,*/", 0x0D, 0x0A, "               ,,...../..,.,,,***/******,,*,*//", 0x0D, 0x0a, "             ,,.  ..,,,,,//((##%%%%%%####(/,,..,*", 0x0D, 0x0a, "           .,*.  ,,****,/((#####%%%&%%#####(/*....", 0x0D, 0x0a, "           *.. .**//***/((((###%%%%&%%####(#(/,....", 0x0D, 0x0a, "          ,,...*****/*/(((#######%%%%%%#####(/*....", 0x0D, 0x0a, "          ., .,****/((((((((((######%%%#####((*....", 0x0D, 0x0a, "           ...***,,,,*///(((((((((((/****//(##/,..,", 0x0D, 0x0a, "           ...,,**,....,,,**/((//**...,,..,*/##,...", 0x0D, 0x0a, "            ,.***.,**   ,.,,(#%#*.,**,.,(/(*/#%*.//", 0x0D, 0x0a, "           /../*,,,*/,,,,,,*(###((/*,,,,/(##//(/,*(", 0x0D, 0x0a, "           .,,***/(((((//***/##(((((////(((###///(%", 0x0D, 0x0a, "           , ,**//(((/****,/((#(((((/***/(((((((#%%", 0x0D, 0x0a, "            .******.,*,****/(((((//(((//**,*(#*(#(.", 0x0D, 0x0a, "              ****,,,**,,,,,****//(((/**,,..,/**", 0x0D, 0x0a, "              **/,/*,.,,,,,*,*/*****#//../*./(/", 0x0D, 0x0a, "               ****/*,,#%#&(%%#&&&@@&&.*(/,(*/", 0x0D, 0x0a, "                ,**//**,.*%#%%%&&##*#**((((//", 0x0D, 0x0a, "                  .*//**,*,(((*(#(%%(/((#(*", 0x0D, 0x0a, "              .,***,,/***//***/*///((((#((/(#/##", 0x0D, 0x0a, "        .,****.*/* *,,,****///////((((#(*/(((*/##(##%%", 0x0D, 0x0a, "((///***,,****.**.**,,,,,///(((((((#(((*//,/#/(#########(#%", 0x0D, 0x0a, "/*,,,,**,,**/*,/*,,,,***,,*//(((((((/,*//((*,/###########%%#", 0x0D, 0x0a, 0x00
 
 ECHO:
-	LDI ZL, LOW(LEN_PROGRAMER * 2)
-	LDI ZH, HIGH(LEN_PROGRAMER * 2)
-	CALL FPRINTS
+	LDI XL, LOW(PARAMETER)
+	LDI XH, HIGH(PARAMETER)
+	CALL MPRINTS
 
 	JMP LOOP
 
-SUS:
-	LDI ZL, LOW(JERMA_SUS * 2)
-	LDI ZH, HIGH(JERMA_SUS * 2)
-	CALL FPRINTS
+PIN:
+	LDI XL, LOW(PARAMETER)
+	LDI XH,	HIGH(PARAMETER)
+	LD R16, X+
+	CPI R16 , 'b'
+	BREQ PIN_B
+	;CPI R16 , 'c'
+	;BREQ PIN_C
+	;CPI R16 , 'd'
+	;BREQ PIN_D
+	RJMP NOT_A_PORT
+
+	PIN_B:
+	LD R16, X+
+	CPI R16, 0x00
+	BRLT WRONG_PIN
+	CPI R16, 0x07
+	BRGE WRONG_PIN
+	LD R17, X
+	CPI R17, 0x01
+	BREQ HIGH_B
+
+	LOW_B:
+	IN R18, DDRD
+	LDI R16, 0xFE
+	LDI R19, 0xFF
+	ADD R16, R19
+	LOW_PIN_B_LOOP:
+	DEC R17
+	BREQ LOW_PIN_B_OUT
+	ROL R16
+	RJMP LOW_PIN_B_LOOP
+	LOW_PIN_B_OUT:
+	AND R16, R18
+	OUT DDRD, R16
+
+	HIGH_B:
+	IN R18, DDRD
+	LDI R16, 0x01
+	HIGH_PIN_B_LOOP:
+	DEC R17
+	BREQ HIGH_PIN_B_OUT
+	LSL R16
+	RJMP HIGH_PIN_B_LOOP
+	HIGH_PIN_B_OUT:
+	OR R16,R18
+	OUT DDRD, R16
+	OUT PIND, R16
 
 	JMP LOOP
+
+
+
+	WRONG_PIN:
+	NOT_A_PORT:
+	LDI ZL, LOW(NOT_FOUND_MSG * 2)
+	LDI ZH, HIGH(NOT_FOUND_MSG * 2)
+	CALL FPRINTS
+	JMP LOOP
+
 
 ; Pošlje znak v registru R16 po UART-u.
 ;
@@ -432,7 +484,7 @@ LOCI_1:
 	LD R17, X+
 	CPI R17, 0x20
 	BREQ NAPREJ2
-	CPI R17, 0x00
+	CPI R17, 0x0D
 	BREQ KONEC
 	DEC R18 
 	BREQ KONEC
