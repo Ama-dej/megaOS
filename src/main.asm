@@ -168,7 +168,7 @@ NOT_FOUND_MSG: .DB "Command not found.", 0x0A, 0x0D, 0x00
 LEN_PROGRAMER: .DB "Ni implementirano ker je bil programer len.", 0x0A, 0x0D, "Lp programer", 0x0D, 0x0A, 0x00
 
 COMMAND_START:
-.DB "echo", 0x00, "sus", 0x00, 0x03
+.DB "echo", 0x00, "pin", 0x00, 0x03
 COMMAND_END:
 
 COMMAND_JUMP_TABLE_START:
@@ -239,8 +239,8 @@ PIN:
 
 	WRONG_PIN:
 	NOT_A_PORT:
-	LDI ZL, LOW(NOT_FOUND_MSG * 2)
-	LDI ZH, HIGH(NOT_FOUND_MSG * 2)
+	LDI ZL, LOW(LEN_PROGRAMER * 2)
+	LDI ZH, HIGH(LEN_PROGRAMER * 2)
 	CALL FPRINTS
 	JMP LOOP
 
