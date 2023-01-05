@@ -195,7 +195,7 @@ PIN:
 
 	PIN_B:
 	LD R16, X
-	CPI R16, '6'
+	CPI R16, '6'   ; prevermo da ni prevelika vrednost
 	BRGE NOT_A_PORT
 	LDI R16, 0xFF
 	OUT DDRB, R16
